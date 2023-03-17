@@ -1,0 +1,66 @@
+version: "3.9"
+
+volumes:
+
+  pg_data:
+    driver: local
+  rm_data:
+    driver: local
+  tc_app:
+    driver: local
+
+services:
+
+  postgis:
+    image: postgis/postgis:15-3.3-alpine
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  rabbitmq: 
+    image: rabbitmq:3.11.10-management-alpine
+    ports:
+      - 5672:5672
+      - 15672:15672
+    volumes:
+      - rm_data:/var/lib/rabbitmq/
+    environment:
+      RABBITMQ_DEFAULT_USER: "guest"
+      RABBITMQ_DEFAULT_PASS: "guest"
+    healthcheck:
+      test: [ "CMD", "nc", "-z", "localhost", "5672" ]
+      interval: 5s
+      timeout: 10s
+      retries: 3
+  
+  tomcat:
+    # the below image has a critical vuln.  Need to consider replacing
+    image: tomcat:8-jdk8-temurin-jammy
+    ports: 
+      - 8081:8080
+    volumes:
+      # $CATALINA_HOME
+      - tc_app:/usr/local/tomcat/
+  
+  nginx_lb:
+    # load balancer
+    image: nginx:1.23.3-alpine
+    ports:
+      - 8080:80
+    volumes:
+      - ./sample/nginx_lb/nginx.conf:/etc/nginx/nginx.conf:ro 
+
+  nginx_1:
+    # first server
+    image: nginx:1.23.3-alpine
+    volumes:
+      - ./sample/nginx_1/server1.html:/usr/share/nginx/html/index.html 
+
+  nginx_2:
+    # second server
+    image: nginx:1.23.3-alpine
+    volumes:
+      - ./sample/nginx_2/server2.html:/usr/share/nginx/html/index.html 
